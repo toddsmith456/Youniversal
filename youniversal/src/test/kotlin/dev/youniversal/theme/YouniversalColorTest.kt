@@ -167,8 +167,18 @@ class YouniversalColorTest {
     fun blendingAtTheEndpointsReturnsTheSourceSchemes() {
         val from = youniversalLightColorScheme()
         val to = youniversalDarkColorScheme()
-        assertEquals(from.primary, from.youniversalBlend(to, 0f).primary)
-        assertEquals(to.primary, from.youniversalBlend(to, 1f).primary)
+        // lerp rebuilds each role from float channels and Color packs those as half floats, so
+        // the round trip is not bit-exact. Compare channels within a tolerance rather than
+        // asserting Color equality.
+        assertSameColor(from.primary, from.youniversalBlend(to, 0f).primary)
+        assertSameColor(to.primary, from.youniversalBlend(to, 1f).primary)
+    }
+
+    private fun assertSameColor(expected: Color, actual: Color) {
+        assertEquals(expected.red, actual.red, 0.002f)
+        assertEquals(expected.green, actual.green, 0.002f)
+        assertEquals(expected.blue, actual.blue, 0.002f)
+        assertEquals(expected.alpha, actual.alpha, 0.002f)
     }
 
     @Test

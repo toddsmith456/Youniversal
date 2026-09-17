@@ -74,6 +74,26 @@ jobs:
             exit 1
           }
 
+      # The runner's log and artifact endpoints are not always reachable, so failing
+      # tests are restated here as annotations, which are readable through the API.
+      - name: Report failed tests as annotations
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          files = glob.glob('**/build/test-results/**/*.xml', recursive=True)
+          print('test result files found:', len(files))
+          failures = 0
+          for path in files:
+              for case in ET.parse(path).getroot().iter('testcase'):
+                  for bad in list(case.iter('failure')) + list(case.iter('error')):
+                      failures += 1
+                      detail = (bad.get('message') or bad.text or '').strip().replace('\n', ' ')
+                      print('::error::%s.%s -> %s'
+                            % (case.get('classname'), case.get('name'), detail[:400]))
+          print('failing tests:', failures)
+          PY
+
       - name: Assemble library and demo (debug + minified release)
         run: |
           set -o pipefail

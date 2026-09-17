@@ -63,7 +63,7 @@ public fun YouniversalTopBar(
         navigationIcon = navigationIcon,
         actions = actions,
         colors =
-            TopAppBarDefaults.centerAlignedTopAppBarColors(
+            TopAppBarDefaults.topAppBarColors(
                 containerColor = containerColor,
                 scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.92f),
             ),
