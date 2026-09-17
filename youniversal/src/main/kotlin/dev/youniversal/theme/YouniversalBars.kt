@@ -18,7 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarDefaults
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemColors
 import androidx.compose.material3.Surface
@@ -140,14 +140,9 @@ public fun RowScope.YouniversalNavigationItem(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     showLabel: Boolean = true,
-    colors: NavigationBarItemColors =
-        NavigationBarDefaults.itemColors(
-            selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
-            selectedTextColor = MaterialTheme.colorScheme.onSurface,
-            indicatorColor = MaterialTheme.colorScheme.secondaryContainer,
-            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
+    // Material 3 1.4.0 offers only the no-argument item-colour factory; its defaults are
+    // already onSecondaryContainer / secondaryContainer / onSurfaceVariant.
+    colors: NavigationBarItemColors = NavigationBarItemDefaults.colors(),
 ) {
     NavigationBarItem(
         selected = selected,

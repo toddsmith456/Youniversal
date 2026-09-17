@@ -7,6 +7,7 @@ import androidx.compose.material3.ChipColors
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SelectableChipColors
 import androidx.compose.material3.SuggestionChip
 import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Text
@@ -48,7 +49,7 @@ public fun YouniversalFilterChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = YouniversalShapes.Pill,
-    colors: ChipColors =
+    colors: SelectableChipColors =
         FilterChipDefaults.filterChipColors(
             selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
             selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -73,7 +74,7 @@ public fun YouniversalSuggestionChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = YouniversalShapes.Pill,
-    colors: ChipColors = SuggestionChipDefaults.suggestionChipColors(),
+    colors: SelectableChipColors = SuggestionChipDefaults.suggestionChipColors(),
 ) {
     SuggestionChip(
         onClick = onClick,

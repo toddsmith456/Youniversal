@@ -55,6 +55,6 @@ public object YouniversalMotion {
         spring(
             dampingRatio = Spring.DampingRatioNoBouncy,
             stiffness = Spring.StiffnessMediumLow,
-            visibilityThreshold = Float.VisibilityThreshold,
+            visibilityThreshold = 0.01f,   // the Float threshold animation-core uses
         )
 }

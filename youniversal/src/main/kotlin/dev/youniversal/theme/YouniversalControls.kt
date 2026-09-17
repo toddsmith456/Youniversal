@@ -2,7 +2,6 @@
 package dev.youniversal.theme
 
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -58,19 +57,14 @@ public fun YouniversalCheckbox(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    val scheme = MaterialTheme.colorScheme
+    // Material 3 1.4.0 exposes only the no-argument colours factory; the parameterised
+    // overload arrived in 1.5.0-alpha28. Its defaults already resolve to
+    // primary / onPrimary / outline, which is exactly what Youniversal would ask for.
     Checkbox(
         checked = checked,
         onCheckedChange = onCheckedChange,
         modifier = modifier,
         enabled = enabled,
-        colors =
-            CheckboxDefaults.colors(
-                checkedBoxColor = scheme.primary,
-                checkedCheckColor = scheme.onPrimary,
-                checkedBorderColor = scheme.primary,
-                uncheckedBorderColor = scheme.outline,
-            ),
     )
 }
 
