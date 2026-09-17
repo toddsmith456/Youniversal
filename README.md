@@ -378,6 +378,11 @@ Youniversal/
 
 ## Building and verifying
 
+Continuous integration lives in [`.github/workflows/ci.yml`](.github/workflows/ci.yml): a
+`palette` job (Python, no JVM) that asserts the contrast floor and that
+`YouniversalPalette.kt` still matches the generator, and a `build` job that compiles everything
+and uploads the demo APK. Locally:
+
 ```bash
 gradle wrapper --gradle-version 8.13     # generates the wrapper if it isn't checked in
 ./gradlew :app:assembleDebug             # build and install the demo
@@ -393,9 +398,11 @@ XML files and the version catalog parse. The palette maths and every assertion i
 `YouniversalColorTest.kt` were executed against `tools/palette_lab.py` and pass.
 
 What could **not** be run in the environment where this was written: `./gradlew` itself. There
-is no JVM, no Android SDK, and no access to the Maven repositories, so the project has not been
-compiled end to end. Run the four commands above and treat any compiler complaint as a bug to
-report.
+is no JVM, no Android SDK, and no access to the Maven repositories, so the project was never
+compiled end to end here. `.github/workflows/ci.yml` closes that gap — on every push it runs the
+contrast and generator-parity checks, the unit tests, and `assembleDebug` plus a minified
+`assembleRelease` (which also exercises `app/proguard-rules.pro`) on JDK 17 with Gradle 8.13.
+If the first CI run fails, the compiler is right and the code is wrong.
 
 ## License
 

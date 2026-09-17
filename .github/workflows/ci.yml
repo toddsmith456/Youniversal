@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A new push to the same branch supersedes the run in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Fast, no JVM: proves the palettes still meet their contrast floor and that
+  # the generated Kotlin has not been hand-edited away from the generator.
+  palette:
+    name: Palette contrast + generator parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Exits non-zero if any of the 22 text/surface pairs drops below 4.5:1.
+      - name: Verify WCAG contrast of all three palettes
+        run: python3 tools/palette_lab.py
+
+      # Exits non-zero if YouniversalPalette.kt differs from the generated output.
+      - name: Verify YouniversalPalette.kt matches the generator
+        run: python3 tools/palette_lab.py --verify
+
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      # Pin the platform the project compiles against. Build tools are left to
+      # AGP so it can pick the version it actually expects.
+      - name: Install Android platform 36
+        run: sdkmanager --install "platforms;android-36"
+
+      # The repository ships gradle-wrapper.properties but not the wrapper JAR,
+      # so the action supplies Gradle itself.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Unit tests (color engine, JVM)
+        run: gradle :youniversal:testDebugUnitTest --stacktrace
+
+      - name: Assemble the library
+        run: gradle :youniversal:assembleRelease --stacktrace
+
+      - name: Assemble the demo app
+        run: gradle :app:assembleDebug --stacktrace
+
+      # Also exercises R8 with app/proguard-rules.pro.
+      - name: Assemble the demo app (release, minified)
+        run: gradle :app:assembleRelease --stacktrace
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: youniversal/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Upload demo APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: youniversal-demo-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn

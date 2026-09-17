@@ -6,7 +6,9 @@ The tone generator here is the same algorithm that ships in Kotlin
 Running this script prints the exact hex values used in YouniversalPalette.kt and
 asserts WCAG 2.1 contrast for every text/surface pairing the theme ships.
 """
+import difflib
 import math
+import os
 import sys
 
 # ---------------------------------------------------------------- sRGB <-> Lab
@@ -202,8 +204,12 @@ def check(name, scheme, minimum=4.5):
     return not failures
 
 
-def dump_kotlin(name, scheme, factory):
-    print('\n// ---- %s ----' % name)
+KOTLIN_TARGET = os.path.join('youniversal', 'src', 'main', 'kotlin', 'dev', 'youniversal',
+                             'theme', 'YouniversalPalette.kt')
+
+
+def kotlin_block(name, scheme, factory):
+    """Render one color-scheme function exactly as it appears in YouniversalPalette.kt."""
     order = ['primary', 'onPrimary', 'primaryContainer', 'onPrimaryContainer', 'inversePrimary',
              'secondary', 'onSecondary', 'secondaryContainer', 'onSecondaryContainer',
              'tertiary', 'onTertiary', 'tertiaryContainer', 'onTertiaryContainer',
@@ -217,15 +223,62 @@ def dump_kotlin(name, scheme, factory):
              'secondaryFixed', 'secondaryFixedDim', 'onSecondaryFixed', 'onSecondaryFixedVariant',
              'tertiaryFixed', 'tertiaryFixedDim', 'onTertiaryFixed', 'onTertiaryFixedVariant']
     assert set(order) == set(scheme), set(scheme) ^ set(order)
-    print('public fun youniversal%sColorScheme(): ColorScheme =' % name)
-    print('    %s(' % factory)
-    for i, key in enumerate(order):
-        comma = ',' if i < len(order) - 1 else ','
-        print('        %s = Color(0xFF%s)%s' % (key, scheme[key].lstrip('#'), comma))
-    print('    )')
+    lines = ['\n// ---- %s ----' % name,
+             'public fun youniversal%sColorScheme(): ColorScheme =' % name,
+             '    %s(' % factory]
+    for key in order:
+        lines.append('        %s = Color(0xFF%s),' % (key, scheme[key].lstrip('#')))
+    lines.append('    )')
+    return '\n'.join(lines)
 
 
-def main():
+def dump_kotlin(name, scheme, factory):
+    print(kotlin_block(name, scheme, factory))
+
+
+def scheme_function(text, name):
+    """Extract one generated function from the committed Kotlin file."""
+    signature = 'public fun youniversal%sColorScheme(): ColorScheme =' % name
+    start = text.index(signature)
+    end = text.index('\n    )', start) + len('\n    )')
+    return text[start:end]
+
+
+def verify(path):
+    """Fail if YouniversalPalette.kt has drifted from what the generator produces."""
+    try:
+        committed = open(path, encoding='utf-8').read()
+    except OSError as exc:
+        print('cannot read %s: %s' % (path, exc))
+        return 1
+    ok = True
+    for name, scheme, factory in build_schemes():
+        # The committed file carries no '// ---- X ----' separators, so compare
+        # from the function signature onward.
+        generated = kotlin_block(name, scheme, factory)
+        generated = generated[generated.index('public fun'):].strip()
+        try:
+            actual = scheme_function(committed, name).strip()
+        except ValueError:
+            print('%-6s MISSING from %s' % (name, path))
+            ok = False
+            continue
+        if generated == actual:
+            print('%-6s matches the generator (48 roles)' % name)
+        else:
+            ok = False
+            print('%-6s DRIFTED from the generator:' % name)
+            for line in difflib.unified_diff(generated.splitlines(), actual.splitlines(),
+                                             'generated', 'committed', lineterm='', n=1):
+                print('    ' + line)
+    print('\n%s' % ('%s is in sync with tools/palette_lab.py' % os.path.basename(path)
+                     if ok else 'run `python3 tools/palette_lab.py` and paste the three '
+                                'functions back into %s' % path))
+    return 0 if ok else 1
+
+
+def build_schemes():
+    """Build the three shipped palettes. Returns (name, scheme, factory) triples."""
     indigo = tonal_palette('#3E63DD')
     slate = tonal_palette('#5C6391', 0.72)
     teal = tonal_palette('#0F9C8E')
@@ -261,12 +314,24 @@ def main():
     for scheme in (light, dark, cream):
         scheme['scrim'] = '#000000'
 
-    ok = all([check('Light', light), check('Dark', dark), check('Cream', cream)])
+    return [('Light', light, 'lightColorScheme'),
+            ('Dark', dark, 'darkColorScheme'),
+            ('Cream', cream, 'lightColorScheme')]
 
-    dump_kotlin('Light', light, 'lightColorScheme')
-    dump_kotlin('Dark', dark, 'darkColorScheme')
-    dump_kotlin('Cream', cream, 'lightColorScheme')
 
+def main(argv):
+    if '--verify' in argv:
+        path = argv[argv.index('--verify') + 1] if len(argv) > argv.index('--verify') + 1 else KOTLIN_TARGET
+        return verify(path)
+
+    schemes = build_schemes()
+    ok = all([check(name, scheme) for name, scheme, _ in schemes])
+
+    for name, scheme, factory in schemes:
+        dump_kotlin(name, scheme, factory)
+
+    indigo = tonal_palette('#3E63DD')
+    paper = tonal_palette('#8A6B3F', 0.30)
     print('\nSample ramps (indigo / paper):')
     for t in (10, 20, 30, 40, 80, 90, 95, 99):
         print('  tone %-3d indigo %s   paper %s' % (t, indigo[t], paper[t]))
@@ -274,4 +339,4 @@ def main():
 
 
 if __name__ == '__main__':
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))
