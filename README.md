@@ -245,6 +245,10 @@ Everything lives in `dev.youniversal.theme` and is prefixed `Youniversal`.
 | Feedback | `YouniversalAlertDialog`, `YouniversalSnackbarHost`, `YouniversalEmptyState`, `YouniversalProgressBar` |
 | Inspection | `youniversalColorRoles()`, `YouniversalColorSwatch`, `YouniversalPalettePreview` |
 
+`YouniversalTopBar` takes a `TopAppBarScrollBehavior`, which Material 3 still marks experimental,
+so files that call it need `@file:OptIn(ExperimentalMaterial3Api::class)`. The demo does exactly
+that in `DemoApp.kt`.
+
 Components take `ImageVector` rather than pulling in `material-icons-extended`, so you stay free
 to use whatever icon set you like. `YouniversalAvatar` shows either initials or an icon:
 `YouniversalAvatar(initials = "TS")`, `YouniversalAvatar(icon = SyncIcon)`. `YouniversalBackdrop` draws three gradient treatments —

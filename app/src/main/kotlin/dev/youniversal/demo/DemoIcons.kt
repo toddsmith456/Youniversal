@@ -65,10 +65,10 @@ public object DemoIcons {
         vector("Overview") {
             path(fill = Ink) {
                 moveTo(12f, 2f)
-                quadraticBezierTo(13.2f, 10.8f, 22f, 12f)
-                quadraticBezierTo(13.2f, 13.2f, 12f, 22f)
-                quadraticBezierTo(10.8f, 13.2f, 2f, 12f)
-                quadraticBezierTo(10.8f, 10.8f, 12f, 2f)
+                quadraticTo(13.2f, 10.8f, 22f, 12f)
+                quadraticTo(13.2f, 13.2f, 12f, 22f)
+                quadraticTo(10.8f, 13.2f, 2f, 12f)
+                quadraticTo(10.8f, 10.8f, 12f, 2f)
                 close()
             }
         }
