@@ -74,7 +74,7 @@ public fun YouniversalSuggestionChip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     shape: Shape = YouniversalShapes.Pill,
-    colors: SelectableChipColors = SuggestionChipDefaults.suggestionChipColors(),
+    colors: ChipColors = SuggestionChipDefaults.suggestionChipColors(),
 ) {
     SuggestionChip(
         onClick = onClick,

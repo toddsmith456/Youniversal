@@ -94,7 +94,7 @@ public fun <T> YouniversalSegmentedControl(
                     .padding(inset)
                     .width(itemWidth - inset * 2)
                     .fillMaxHeight()
-                    .offset { IntOffset(roundToInt(animatedIndex * itemWidthPx), 0) }
+                    .offset { IntOffset((animatedIndex * itemWidthPx).roundToInt(), 0) }
                     .clip(shape)
                     .background(scheme.primary.copy(alpha = trackAlpha)),
         )
