@@ -127,3 +127,13 @@ jobs:
           name: youniversal-demo-debug
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
+
+      # The release APK is the one worth sideloading; CI keeps it available from every run.
+      # The releases themselves are cut by .github/workflows/release.yml on a v* tag.
+      - name: Upload demo APK (release)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youniversal-demo-release
+          path: app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn

@@ -1,0 +1,280 @@
+# Release — builds every installable/publishable artifact for a version and attaches it to a
+# GitHub Release.
+#
+# Cutting a release is one command:
+#
+#     git tag v1.0.0 && git push origin v1.0.0
+#
+# The tag has to agree with the `youniversal` version in gradle/libs.versions.toml, so the
+# APK's versionName, the Maven coordinates and the tag can never drift apart. The workflow can
+# also be dispatched by hand (Actions ▸ Release ▸ Run workflow), which creates the tag for you
+# at the dispatched commit.
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (for example v1.0.0). Created at the dispatched commit if it does not exist.'
+        required: true
+        default: v1.0.0
+
+# GITHUB_TOKEN creates the release, and the tag when the run is dispatched by hand.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Runner images ship the Android SDK with licences accepted; we only add the
+  # platform this project compiles against.
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  # Same fast, JVM-free gate as CI: never publish a build whose palettes dropped below the
+  # contrast floor or whose generated Kotlin was hand-edited away from the generator.
+  palette:
+    name: Palette contrast + generator parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Verify WCAG contrast of all three palettes
+        run: python3 tools/palette_lab.py
+
+      - name: Verify YouniversalPalette.kt matches the generator
+        run: python3 tools/palette_lab.py --verify
+
+  release:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    needs: palette
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags and the full tree, so the run can verify (and for a manual dispatch create)
+          # the tag it is publishing.
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android platform 36
+        run: |
+          set -u
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          ls "$SDK" || echo "::error::Android SDK not found at $SDK"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" \
+            || echo "::error::sdkmanager could not install platforms;android-36"
+
+      # The repository ships gradle-wrapper.properties but not the wrapper JAR, so the action
+      # supplies Gradle itself.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Resolve the version and the tag
+        id: version
+        run: |
+          set -euo pipefail
+          version=$(sed -n 's/^youniversal *= *"\([^"]*\)".*/\1/p' gradle/libs.versions.toml | head -1)
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          if [ -z "$version" ] || [ -z "$tag" ]; then
+            echo "::error::could not resolve the version ($version) or the tag ($tag)"
+            exit 1
+          fi
+          if [ "$tag" != "v$version" ]; then
+            echo "::error::tag $tag disagrees with the version $version in gradle/libs.versions.toml"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Create the tag when dispatching by hand
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            echo "$TAG already exists; releasing that commit."
+          else
+            git tag -a "$TAG" -m "Youniversal $TAG"
+            git push origin "refs/tags/$TAG"
+          fi
+
+      # Failures are echoed back as workflow annotations so the compiler's own messages are
+      # readable without opening the raw log.
+      - name: Unit tests (color engine, JVM)
+        run: |
+          set -o pipefail
+          gradle :youniversal:testDebugUnitTest --stacktrace 2>&1 | tee build-tests.log || {
+            grep -E "^e: |^w: |error:|FAILURE:|What went wrong|Caused by:|> Task .* FAILED" -A 3 build-tests.log \
+              | head -80 | while IFS= read -r line; do echo "::error::${line}"; done
+            exit 1
+          }
+
+      # Debug APK (unminified, Compose tooling), minified release APK, and the library with its
+      # sources jar and POM written to the local Maven repository.
+      - name: Assemble the demo APKs and the library
+        run: |
+          set -o pipefail
+          gradle :app:assembleDebug :app:assembleRelease \
+                 :youniversal:publishReleasePublicationToMavenLocal --stacktrace 2>&1 \
+            | tee build-release.log || {
+            grep -E "^e: |^w: |error:|FAILURE:|What went wrong|Caused by:|> Task .* FAILED" -A 3 build-release.log \
+              | head -120 | while IFS= read -r line; do echo "::error::${line}"; done
+            exit 1
+          }
+
+      - name: Stage the release assets
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          m2="$HOME/.m2/repository/dev/youniversal/youniversal-theme/$VERSION"
+
+          # Required: without these there is nothing to release.
+          cp app/build/outputs/apk/release/app-release.apk \
+            "dist/youniversal-demo-$VERSION-release.apk"
+          cp app/build/outputs/apk/debug/app-debug.apk \
+            "dist/youniversal-demo-$VERSION-debug.apk"
+          cp youniversal/build/outputs/aar/youniversal-release.aar \
+            "dist/youniversal-theme-$VERSION.aar"
+
+          # Optional: present with AGP's maven-publish, skipped rather than fatal if not.
+          copy_if_present() {
+            if [ -f "$1" ]; then
+              cp "$1" "$2"
+            else
+              echo "::warning::expected $1 was not produced; ${2##*/} will be missing from the release"
+            fi
+          }
+          copy_if_present "$m2/youniversal-theme-$VERSION-sources.jar" \
+            "dist/youniversal-theme-$VERSION-sources.jar"
+          copy_if_present "$m2/youniversal-theme-$VERSION.pom" \
+            "dist/youniversal-theme-$VERSION.pom"
+
+          # The whole source tree at this tag, so the release is self-contained.
+          git archive --format=zip --prefix="Youniversal-$VERSION/" \
+            -o "dist/Youniversal-$VERSION-source.zip" HEAD
+
+          # Test report, so a downloaded release carries its own proof it passed.
+          if [ -d youniversal/build/reports/tests/testDebugUnitTest ]; then
+            (cd youniversal/build/reports/tests && zip -qr "$OLDPWD/dist/youniversal-theme-$VERSION-unit-test-report.zip" testDebugUnitTest)
+          fi
+
+          ls -lh dist
+
+      - name: Write the checksums
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum -- *.apk *.aar *.jar *.zip *.pom > SHA256SUMS.txt && cat SHA256SUMS.txt)
+
+      - name: Write the release notes
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          cat > RELEASE_NOTES.md <<'NOTES'
+          # Youniversal @VERSION@
+
+          A production-ready theme system for Jetpack Compose: **Light**, **Dark** and **Cream**
+          background themes, full Material You (dynamic colour) support on Android 12+, a persisted
+          toggle so it can live inside an app that already has its own theme, and a component
+          library built to look finished rather than demo-grade.
+
+          ## Downloads
+
+          | Asset | What it is |
+          | --- | --- |
+          | `youniversal-demo-@VERSION@-release.apk` | The demo app, minified and resource-shrunk (`assembleRelease`). **Signed with the standard Android debug key**, so it installs by sideloading but cannot go to Google Play. `minSdk 24`, `targetSdk 36`. |
+          | `youniversal-demo-@VERSION@-debug.apk` | The same app, unminified, with the Compose tooling included. Use this one if you want readable stack traces. |
+          | `youniversal-theme-@VERSION@.aar` | The library — drop it in `app/libs/` or publish it to your own Maven repository. |
+          | `youniversal-theme-@VERSION@-sources.jar` | Sources for the library. |
+          | `youniversal-theme-@VERSION@.pom` | Maven coordinates: `dev.youniversal:youniversal-theme:@VERSION@`. |
+          | `Youniversal-@VERSION@-source.zip` | The complete source tree at this tag (GitHub's own `Source code (zip)` / `Source code (tar.gz)` archives are attached to every release as well). |
+          | `youniversal-theme-@VERSION@-unit-test-report.zip` | The JVM unit-test report for the colour engine. |
+          | `SHA256SUMS.txt` | SHA-256 for every asset above. |
+
+          ## Installing the APK
+
+          ```bash
+          adb install -r youniversal-demo-@VERSION@-release.apk
+          ```
+
+          Or copy the file to the device and tap it — Android will ask you to allow installing from
+          that source, since the APK is debug-signed.
+
+          ## Using the library
+
+          ```kotlin
+          dependencies {
+              implementation("dev.youniversal:youniversal-theme:@VERSION@")
+          }
+          ```
+
+          or, from the AAR:
+
+          ```kotlin
+          dependencies {
+              implementation(files("libs/youniversal-theme-@VERSION@.aar"))
+          }
+          ```
+
+          ## Verified before publishing
+
+          - All three palettes meet the WCAG AA contrast floor (`tools/palette_lab.py`).
+          - `YouniversalPalette.kt` still matches the generator that produces it.
+          - The colour-engine unit tests pass on the JVM.
+          - `assembleDebug`, the minified `assembleRelease` (which exercises
+            `app/proguard-rules.pro`) and the library build all succeed.
+
+          Built with JDK 17, Gradle 8.13, AGP 8.13.2, Kotlin 2.3.20 and Compose BOM 2026.04.01.
+
+          Licensed under [MIT](https://github.com/toddsmith456/Youniversal/blob/main/LICENSE).
+          NOTES
+          sed -i "s/@VERSION@/$VERSION/g" RELEASE_NOTES.md
+          head -20 RELEASE_NOTES.md
+
+      # Kept in the run as well, so a failed publish can still be salvaged by hand.
+      - name: Upload the assets to the workflow run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: dist/
+          if-no-files-found: warn
+
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; replacing its assets."
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" \
+              --title "Youniversal $VERSION" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag \
+              dist/*
+          fi
+          gh release view "$TAG" --json tagName,url,assets \
+            --jq '.url, (.assets[] | "\(.name)  \(.size) bytes")'

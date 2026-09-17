@@ -37,6 +37,7 @@ Licensed under [MIT](LICENSE).
 - [How the palette is generated](#how-the-palette-is-generated)
 - [Publishing as a library](#publishing-as-a-library)
 - [Project layout](#project-layout)
+- [Releases](#releases)
 - [Building and verifying](#building-and-verifying)
 - [License](#license)
 
@@ -380,12 +381,51 @@ Youniversal/
 └── tools/palette_lab.py      palette generator + WCAG verifier
 ```
 
+## Releases
+
+Every version is published as a GitHub Release carrying everything needed to install or consume
+it, so there is nothing to build yourself.
+
+**[Latest release →](https://github.com/toddsmith456/Youniversal/releases/latest)**
+
+| Asset | What it is |
+| --- | --- |
+| `youniversal-demo-<version>-release.apk` | The demo app, minified and resource-shrunk. Sideload it with `adb install -r <file>` or by tapping it on the device. **Signed with the standard Android debug key**, so it installs fine but is not a Play Store upload. |
+| `youniversal-demo-<version>-debug.apk` | The same app unminified, with the Compose tooling included — use this one for readable stack traces. |
+| `youniversal-theme-<version>.aar` | The library. Drop it in `app/libs/` or publish it to your own Maven repository. |
+| `youniversal-theme-<version>-sources.jar`, `.pom` | Sources, and the POM for `dev.youniversal:youniversal-theme:<version>`. |
+| `Youniversal-<version>-source.zip` | The complete source tree at that tag. GitHub attaches its own `Source code (zip)` / `(tar.gz)` archives to the release as well. |
+| `youniversal-theme-<version>-unit-test-report.zip` | The JVM unit-test report for the colour engine. |
+| `SHA256SUMS.txt` | SHA-256 of every asset above. |
+
+The APKs target `minSdk 24` / `targetSdk 36`, and Material You (dynamic colour) activates on
+Android 12 or newer.
+
+### Cutting a release
+
+The version lives in exactly one place — `youniversal` in `gradle/libs.versions.toml` — and the
+tag must match it, so the APK's `versionName`, the Maven coordinates and the tag cannot drift
+apart. To publish version *X*:
+
+```bash
+# 1. Set youniversal = "X" in gradle/libs.versions.toml, commit it, and merge it into main.
+# 2. Tag that commit and push the tag — pushing the tag is what starts the release.
+git tag -a vX -m "Youniversal vX" && git push origin vX
+```
+
+[`.github/workflows/release.yml`](.github/workflows/release.yml) then re-runs the contrast and
+generator-parity checks, runs the unit tests, builds `:app:assembleDebug`, `:app:assembleRelease`
+and the library together with its sources jar and POM, and attaches every file in the table above
+to the release. A tag that disagrees with `libs.versions.toml` fails the run before anything is
+published. The workflow can also be started by hand from **Actions ▸ Release ▸ Run workflow**,
+which creates the tag at the commit it is dispatched on if that tag does not exist yet.
+
 ## Building and verifying
 
 Continuous integration lives in [`.github/workflows/ci.yml`](.github/workflows/ci.yml): a
 `palette` job (Python, no JVM) that asserts the contrast floor and that
 `YouniversalPalette.kt` still matches the generator, and a `build` job that compiles everything
-and uploads the demo APK. Locally:
+and uploads both demo APKs. Locally:
 
 ```bash
 gradle wrapper --gradle-version 8.13     # generates the wrapper if it isn't checked in
