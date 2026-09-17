@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A new push to the same branch supersedes the run in flight.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Runner images ship the Android SDK with licences accepted; we only add the
+  # platform this project compiles against.
+  ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+
+jobs:
+  # Fast, no JVM: proves the palettes still meet their contrast floor and that
+  # the generated Kotlin has not been hand-edited away from the generator.
+  palette:
+    name: Palette contrast + generator parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Exits non-zero if any of the 22 text/surface pairs drops below 4.5:1.
+      - name: Verify WCAG contrast of all three palettes
+        run: python3 tools/palette_lab.py
+
+      # Exits non-zero if YouniversalPalette.kt differs from the generated output.
+      - name: Verify YouniversalPalette.kt matches the generator
+        run: python3 tools/palette_lab.py --verify
+
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Build tools are left to AGP so it can pick the version it expects.
+      - name: Install Android platform 36
+        run: |
+          set -u
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          echo "SDK=$SDK"
+          ls "$SDK" || echo "::error::Android SDK not found at $SDK"
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" --install "platforms;android-36" \
+            || echo "::error::sdkmanager could not install platforms;android-36"
+
+      # The repository ships gradle-wrapper.properties but not the wrapper JAR,
+      # so the action supplies Gradle itself.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      # Failures are echoed back as workflow annotations so the compiler's own
+      # messages are readable without opening the raw log.
+      - name: Unit tests (color engine, JVM)
+        run: |
+          set -o pipefail
+          gradle :youniversal:testDebugUnitTest --stacktrace 2>&1 | tee build-tests.log || {
+            grep -E "^e: |^w: |error:|FAILURE:|What went wrong|Caused by:|> Task .* FAILED" -A 3 build-tests.log \
+              | head -80 | while IFS= read -r line; do echo "::error::${line}"; done
+            exit 1
+          }
+
+      # The runner's log and artifact endpoints are not always reachable, so failing
+      # tests are restated here as annotations, which are readable through the API.
+      - name: Report failed tests as annotations
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          files = glob.glob('**/build/test-results/**/*.xml', recursive=True)
+          print('test result files found:', len(files))
+          failures = 0
+          for path in files:
+              for case in ET.parse(path).getroot().iter('testcase'):
+                  for bad in list(case.iter('failure')) + list(case.iter('error')):
+                      failures += 1
+                      detail = (bad.get('message') or bad.text or '').strip().replace('\n', ' ')
+                      print('::error::%s.%s -> %s'
+                            % (case.get('classname'), case.get('name'), detail[:400]))
+          print('failing tests:', failures)
+          PY
+
+      - name: Assemble library and demo (debug + minified release)
+        run: |
+          set -o pipefail
+          gradle :youniversal:assembleRelease :app:assembleDebug :app:assembleRelease --stacktrace 2>&1 \
+            | tee build-assemble.log || {
+            grep -E "^e: |^w: |error:|FAILURE:|What went wrong|Caused by:|> Task .* FAILED" -A 3 build-assemble.log \
+              | head -120 | while IFS= read -r line; do echo "::error::${line}"; done
+            exit 1
+          }
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: youniversal/build/reports/tests/
+          if-no-files-found: ignore
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: build-*.log
+          if-no-files-found: ignore
+
+      - name: Upload demo APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youniversal-demo-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
