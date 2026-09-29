@@ -27,17 +27,17 @@ jobs:
       - name: Protocol, theme and app unit tests, lint, debug and unsigned release
         run: |
           set -o pipefail
-          ./gradlew :transfer:test :youniversal:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease --stacktrace 2>&1 | tee build-verification.log
+          ./gradlew :transfer:test :youniversal:testDebugUnitTest :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest :app:assembleRelease --continue --stacktrace 2>&1 | tee build-verification.log
       - name: Surface compiler and test failures
         if: failure()
         run: |
-          grep -E '^e: |error:|FAILURE:|What went wrong|Caused by:' -A 4 build-verification.log | head -140 | while IFS= read -r line; do echo "::error::$line"; done
+          grep -E '^e: |error:|FAILURE:|What went wrong|Caused by:|FAILED|Exception|tests completed' -A 5 build-verification.log | head -180 | while IFS= read -r line; do echo "::error::$line"; done || true
           python3 - <<'PY'
           import glob, xml.etree.ElementTree as ET
           for p in glob.glob('**/build/test-results/**/*.xml', recursive=True):
               for t in ET.parse(p).getroot().iter('testcase'):
-                  for f in t.findall('failure'):
-                      print('::error::' + str(t.attrib) + ' ' + str(f.attrib))
+                  for f in t.findall('failure') + t.findall('error'):
+                      print('::error::' + (str(t.attrib) + ' ' + str(f.attrib) + ' ' + (f.text or '')[:2500]).replace('\n', '%0A'))
           PY
       - uses: actions/upload-artifact@v4
         if: always()

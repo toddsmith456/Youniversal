@@ -91,6 +91,11 @@ class ProtocolTest {
         assertThrows(IllegalArgumentException::class.java) { ByteArray(11).inputStream().readBounded(10) }
         assertThrows(IllegalArgumentException::class.java) { Container.pack("x", "", ByteArray(0)) }
     }
+    @Test fun unsafeMimeFallsBackWithoutAffectingContainerIntegrity() {
+        assertEquals("application/octet-stream", safeMime("text/plain\nmalicious"))
+        assertEquals("text/plain", safeMime("Text/Plain;charset=utf-8"))
+        assertEquals("application/octet-stream", safeMime("*/*"))
+    }
     @Test fun randomInputIsIgnored() {
         val random = Random(42)
         repeat(2000) { assertNull(Frame.parse(random.nextBytes(random.nextInt(3100)))) }

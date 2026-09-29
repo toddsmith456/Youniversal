@@ -22,6 +22,22 @@ fun safeName(name: String): String = name.substringAfterLast('/').substringAfter
     .filter { it.code !in 0..31 && it.code != 127 }.trim().take(240)
     .takeUnless { it.isEmpty() || it == "." || it == ".." } ?: "transfer.bin"
 
+/** Keep untrusted MIME strings out of Android intents and document-provider contracts. */
+fun safeMime(mime: String): String {
+    val base = mime.substringBefore(';').trim().lowercase(java.util.Locale.ROOT)
+    return base.takeIf { it.length <= 255 && it.matches(Regex("[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+")) }
+        ?: "application/octet-stream"
+}
+
+private fun alreadyCompressed(mime: String): Boolean {
+    val type = safeMime(mime)
+    if (type.startsWith("video/")) return true
+    if (type.startsWith("image/") && type !in setOf("image/bmp", "image/x-ms-bmp", "image/svg+xml", "image/tiff", "image/x-icon", "image/vnd.microsoft.icon")) return true
+    if (type.startsWith("audio/") && type !in setOf("audio/wav", "audio/x-wav", "audio/wave", "audio/vnd.wave", "audio/aiff", "audio/x-aiff", "audio/basic", "audio/l16")) return true
+    return type in setOf("application/zip", "application/gzip", "application/x-gzip", "application/x-7z-compressed", "application/vnd.rar", "application/zstd") ||
+        type.endsWith("+zip") || type.startsWith("application/vnd.openxmlformats-officedocument.") || type.startsWith("application/vnd.oasis.opendocument.")
+}
+
 /** Bounds are enforced while reading, never trusted from a provider or gzip trailer. */
 fun InputStream.readBounded(limit: Int): ByteArray {
     val out = ByteArrayOutputStream(minOf(limit, 65536))
@@ -47,7 +63,7 @@ object Container {
         val n = safeName(name).toByteArray(Charsets.UTF_8)
         val t = mime.ifBlank { "application/octet-stream" }.toByteArray(Charsets.UTF_8)
         require(n.size <= 65535 && t.size <= 65535) { "File metadata is too long." }
-        val compressed = if (bytes.size >= 768) ByteArrayOutputStream().also { out ->
+        val compressed = if (bytes.size >= 768 && !alreadyCompressed(mime)) ByteArrayOutputStream().also { out ->
             GZIPOutputStream(out).use { it.write(bytes) }
         }.toByteArray() else null
         val gzip = compressed != null && compressed.size + 64 < bytes.size

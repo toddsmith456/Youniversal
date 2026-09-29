@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -73,7 +74,7 @@ internal fun LightBridgeApp(vm: TransferViewModel, theme: YouniversalThemeState)
         bottomBar = {
             NavigationBar {
                 Page.entries.forEach { item -> NavigationBarItem(selected = page == item, onClick = { page = item },
-                    icon = { Text(item.glyph, style = MaterialTheme.typography.titleLarge) }, label = { Text(item.title) }) }
+                    icon = { Text(item.glyph, style = MaterialTheme.typography.titleLarge, modifier = Modifier.clearAndSetSemantics { }) }, label = { Text(item.title) }) }
             }
         }, snackbarHost = { SnackbarHost(snackbar) },
     ) { padding ->
@@ -160,6 +161,7 @@ private fun Step(number: String, title: String, body: String) {
 private fun SendScreen(state: TransferState, vm: TransferViewModel) {
     var text by rememberSaveable { mutableStateOf("") }
     var playing by rememberSaveable { mutableStateOf(true) }
+    var fullscreen by rememberSaveable { mutableStateOf(false) }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) { playing = true; vm.importFile(uri) }
     }
@@ -174,7 +176,7 @@ private fun SendScreen(state: TransferState, vm: TransferViewModel) {
                 val start = android.os.SystemClock.elapsedRealtime()
                 try { matrices = vm.qrFrames(sending, state.settings.tiles) }
                 catch (e: kotlinx.coroutines.CancellationException) { throw e }
-                catch (e: Exception) { vm.message(e.message ?: "Could not generate QR code."); break }
+                catch (e: Exception) { playing = false; vm.message(e.message ?: "Could not generate QR code."); break }
                 emitted = sending.sequence.get()
                 delay(maxOf(1, 1000L / state.settings.fps - (android.os.SystemClock.elapsedRealtime() - start)))
             }
@@ -199,6 +201,7 @@ private fun SendScreen(state: TransferState, vm: TransferViewModel) {
             FileSummary(sending.name, sending.originalSize.toLong(),
                 if (sending.compressed) "Compressed for a quicker transfer" else "Original bytes · no compression needed")
             QrDisplay(matrices)
+            TextButton({ fullscreen = true }, Modifier.fillMaxWidth()) { Text("Expand QR display") }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text("${emitted} frames shown", style = MaterialTheme.typography.labelMedium)
                 Text("${state.settings.fps} fps target · ${state.settings.tiles} QR", style = MaterialTheme.typography.labelMedium)
@@ -210,6 +213,25 @@ private fun SendScreen(state: TransferState, vm: TransferViewModel) {
             Text("This is a one-way link. Keep sending until the receiving device says “Verified”; the sender cannot know when it is done.",
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Note("Visible to nearby cameras", "The QR stream is not encrypted. Finishing stops the display and releases this file from the sender.")
+        }
+    }
+    if (fullscreen && sending != null) androidx.compose.ui.window.Dialog(
+        onDismissRequest = { fullscreen = false },
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
+            Column(Modifier.fillMaxSize().systemBarsPadding().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    TextButton({ playing = !playing }) { Text(if (playing) "Pause" else "Resume") }
+                    TextButton({ fullscreen = false }) { Text("Close full screen") }
+                }
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    val ratio = if (matrices.size == 2) 2f else 1f
+                    Box(Modifier.width(minOf(maxWidth, maxHeight * ratio))) { QrDisplay(matrices) }
+                }
+                Text("Keep sending until the receiver confirms verification.",
+                    Modifier.padding(12.dp), style = MaterialTheme.typography.labelMedium)
+            }
         }
     }
 }

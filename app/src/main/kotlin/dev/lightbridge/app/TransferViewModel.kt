@@ -172,7 +172,7 @@ internal class TransferViewModel(application: Application) : AndroidViewModel(ap
             val used = directory.listFiles()?.filter { it.extension == "bin" }?.sumOf { it.length() } ?: 0
             require(used + file.bytes.size <= 256L * 1024 * 1024) { "Inbox is full (256 MiB). Save and delete older files, then retry." }
             require(directory.usableSpace > file.bytes.size + 16L * 1024 * 1024) { "Not enough free storage." }
-            val receipt = Receipt(UUID.randomUUID().toString(), file.name, file.mime, file.bytes.size.toLong(), file.digest.hex(), System.currentTimeMillis())
+            val receipt = Receipt(UUID.randomUUID().toString(), file.name, safeMime(file.mime), file.bytes.size.toLong(), file.digest.hex(), System.currentTimeMillis())
             val target = receivedFile(receipt)
             val temp = File(directory, "${receipt.id}.part")
             try {
@@ -192,6 +192,10 @@ internal class TransferViewModel(application: Application) : AndroidViewModel(ap
     }
     private suspend fun refreshHistory() = withContext(Dispatchers.IO) {
         storageMutex.withLock {
+            // A killed process can leave a temp file or a finalized payload without metadata.
+            directory.listFiles()?.filter { it.name.endsWith(".part") ||
+                (it.extension == "bin" && !File(directory, "${it.nameWithoutExtension}.json").exists())
+            }?.forEach { it.delete() }
             val receipts = directory.listFiles()?.filter { it.extension == "json" }?.mapNotNull { f ->
                 runCatching {
                     val o = JSONObject(f.readText())
