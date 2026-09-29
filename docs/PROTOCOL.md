@@ -17,7 +17,10 @@ in source headers and NOTICE. No current AGPL source is incorporated.
 | 16 | u32 | container FNV-1a |
 | 20 | bytes | XOR fountain payload |
 
-QR is byte mode, ECC L, mask 0, four-module quiet zone. The app uses ISO-8859-1 to map
+QR is byte mode, ECC L, automatically selected mask, four-module quiet zone.
+The mask is declared inside each QR symbol and is not part of the fountain protocol.
+We use ZXing’s full mask evaluation rather than pinning mask 0, to improve detection
+of heavily padded frames with this native scanner. The app uses ISO-8859-1 to map
 bytes into ZXing's encoder without Base64. The receiver extracts BYTE_SEGMENTS, **not
 text or QR raw codewords**. Multiple segments are concatenated. Camera frames use the
 Y plane with row/pixel strides respected. QR finder detection handles orientation.

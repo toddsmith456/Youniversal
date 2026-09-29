@@ -2,7 +2,6 @@
 package dev.lightbridge.app
 
 import android.Manifest
-import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -223,6 +222,7 @@ private fun SendScreen(state: TransferState, vm: TransferViewModel) {
         onDismissRequest = { fullscreen = false },
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
     ) {
+        KeepAwake(playing, playing && state.settings.brighten)
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.surface) {
             Column(Modifier.fillMaxSize().systemBarsPadding().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -436,14 +436,15 @@ private fun SettingsScreen(settings: TransferSettings, vm: TransferViewModel, th
 @Composable
 private fun KeepAwake(enabled: Boolean, brighten: Boolean) {
     val view = LocalView.current
-    val activity = LocalContext.current as? Activity
+    val activity = androidx.activity.compose.LocalActivity.current
     val lifecycle = LocalLifecycleOwner.current
-    DisposableEffect(view, activity, lifecycle, enabled, brighten) {
+    val targetWindow = (view.parent as? androidx.compose.ui.window.DialogWindowProvider)?.window ?: activity?.window
+    DisposableEffect(view, targetWindow, lifecycle, enabled, brighten) {
         val previousKeep = view.keepScreenOn
-        val previousBrightness = activity?.window?.attributes?.screenBrightness ?: -1f
+        val previousBrightness = targetWindow?.attributes?.screenBrightness ?: -1f
         fun apply(active: Boolean) {
             view.keepScreenOn = if (active && enabled) true else previousKeep
-            activity?.window?.let { window ->
+            targetWindow?.let { window ->
                 window.attributes = window.attributes.apply { screenBrightness = if (active && brighten) 1f else previousBrightness }
             }
         }

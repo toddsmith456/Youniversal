@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import dev.lightbridge.app.AppIcons
 import dev.youniversal.theme.YouniversalBackgroundStyle
 import dev.youniversal.theme.YouniversalCard
@@ -152,9 +155,11 @@ internal fun ThemePanel(
                 style = MaterialTheme.typography.labelLarge,
                 color = scheme.onSurfaceVariant,
             )
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                maxItemsInEachRow = 3,
             ) {
                 AccentSeeds.forEach { (name, color) ->
                     SeedSwatch(
@@ -224,7 +229,7 @@ private fun SeedSwatch(
         Box(
             modifier =
                 Modifier
-                    .size(38.dp)
+                    .size(48.dp)
                     .clip(CircleShape)
                     .background(if (color == Color.Unspecified) scheme.surfaceContainerHighest else color)
                     .then(
@@ -238,7 +243,8 @@ private fun SeedSwatch(
                             )
                         },
                     )
-                    .clickable(onClick = onClick),
+                    .clickable(onClick = onClick)
+                                .semantics { contentDescription = "$name accent" },
             contentAlignment = Alignment.Center,
         ) {
             when {

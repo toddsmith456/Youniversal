@@ -174,7 +174,7 @@ internal class TransferViewModel(application: Application) : AndroidViewModel(ap
             // are extracted directly at the receiver (never through a lossy decoded string).
             writer.encode(bytes.toString(Charsets.ISO_8859_1), BarcodeFormat.QR_CODE, 0, 0, mapOf(
                 EncodeHintType.MARGIN to 4,
-                EncodeHintType.ERROR_CORRECTION to "L", EncodeHintType.QR_MASK_PATTERN to 0,
+                EncodeHintType.ERROR_CORRECTION to "L",
             ))
         }
     }
