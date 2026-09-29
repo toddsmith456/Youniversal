@@ -14,9 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "LightBridge"
+rootProject.name = "Youniversal"
 
 include(":youniversal")
 include(":app")
-
-include(":transfer")

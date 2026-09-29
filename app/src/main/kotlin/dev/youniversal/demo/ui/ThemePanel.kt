@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-package dev.lightbridge.app
+package dev.youniversal.demo.ui
 
 import android.os.Build
 import androidx.compose.foundation.background
@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -23,9 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
-import dev.lightbridge.app.AppIcons
+import dev.youniversal.demo.DemoIcons
 import dev.youniversal.theme.YouniversalBackgroundStyle
 import dev.youniversal.theme.YouniversalCard
 import dev.youniversal.theme.YouniversalContrast
@@ -95,7 +92,7 @@ internal fun ThemePanel(
                 subtitle =
                     if (state.enabled) "Applied to the whole app"
                     else "Off — the app falls back to baseline Material 3",
-                leadingIcon = AppIcons.Mark,
+                leadingIcon = DemoIcons.Mark,
                 trailing = {
                     YouniversalSwitch(checked = state.enabled, onCheckedChange = state::setEnabled)
                 },
@@ -139,7 +136,7 @@ internal fun ThemePanel(
                         seedActive -> "Paused while an accent seed is active"
                         else -> "Derive the palette from the wallpaper"
                     },
-                leadingIcon = AppIcons.Droplet,
+                leadingIcon = DemoIcons.Droplet,
                 enabled = dynamicAvailable,
                 trailing = {
                     YouniversalSwitch(
@@ -155,11 +152,9 @@ internal fun ThemePanel(
                 style = MaterialTheme.typography.labelLarge,
                 color = scheme.onSurfaceVariant,
             )
-            FlowRow(
+            Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                maxItemsInEachRow = 3,
             ) {
                 AccentSeeds.forEach { (name, color) ->
                     SeedSwatch(
@@ -229,7 +224,7 @@ private fun SeedSwatch(
         Box(
             modifier =
                 Modifier
-                    .size(48.dp)
+                    .size(38.dp)
                     .clip(CircleShape)
                     .background(if (color == Color.Unspecified) scheme.surfaceContainerHighest else color)
                     .then(
@@ -243,8 +238,7 @@ private fun SeedSwatch(
                             )
                         },
                     )
-                    .clickable(onClick = onClick)
-                                .semantics { contentDescription = "$name accent" },
+                    .clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             when {
@@ -257,7 +251,7 @@ private fun SeedSwatch(
 
                 selected ->
                     Icon(
-                        imageVector = AppIcons.Check,
+                        imageVector = DemoIcons.Check,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = color.youniversalReadableContentColor(),

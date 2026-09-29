@@ -37,7 +37,6 @@ compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-mani
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
-kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
