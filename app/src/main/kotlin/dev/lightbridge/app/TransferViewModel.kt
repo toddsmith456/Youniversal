@@ -34,7 +34,7 @@ internal data class Reception(
     val receipt: Receipt? = null, val error: String? = null, val differentStream: Boolean = false,
 )
 internal data class TransferState(
-    val busy: Boolean = false, val sending: Sending? = null, val reception: Reception = Reception(),
+    val maxFileBytes: Int = MAX_FILE_BYTES, val busy: Boolean = false, val sending: Sending? = null, val reception: Reception = Reception(),
     val history: List<Receipt> = emptyList(), val settings: TransferSettings = TransferSettings(), val message: String? = null,
 )
 
@@ -46,7 +46,9 @@ internal class TransferViewModel(application: Application) : AndroidViewModel(ap
         prefs.getInt("tiles", 1).takeIf { it in listOf(1, 2, 4) } ?: 1,
         prefs.getBoolean("brighten", true),
     )
-    private val mutable = MutableStateFlow(TransferState(settings = initialSettings))
+    // Leave headroom for source, container, compression, reconstructed output, UI, and graph objects.
+    private val memoryLimit = minOf(MAX_FILE_BYTES.toLong(), Runtime.getRuntime().maxMemory() / 8).toInt()
+    private val mutable = MutableStateFlow(TransferState(settings = initialSettings, maxFileBytes = memoryLimit))
     val state = mutable.asStateFlow()
     private val epoch = AtomicInteger(0)
     private data class Scanned(val epoch: Int, val bytes: ByteArray)
@@ -67,37 +69,46 @@ internal class TransferViewModel(application: Application) : AndroidViewModel(ap
                 if (finished) continue
                 val frame = Frame.parse(scan.bytes) ?: continue
                 try {
-                    if (decoder == null) decoder = FountainDecoder(frame.stream)
+                    if (decoder == null) {
+                        require(frame.stream.totalSize <= memoryLimit + 131119) {
+                            "This device's safe transfer limit is ${formatSize(memoryLimit.toLong())}. Choose a smaller file."
+                        }
+                        decoder = FountainDecoder(frame.stream, memoryLimit.toLong(), 500_000)
+                    }
                     val current = decoder
                     if (current.stream != frame.stream) {
-                        mutable.update { it.copy(reception = it.reception.copy(differentStream = true)) }
+                        updateReception(scan.epoch) { it.copy(differentStream = true) }
                         continue // Never discard partial progress because another screen entered view.
                     }
                     current.add(frame)
                     if (scan.epoch != epoch.get()) continue
-                    mutable.update { it.copy(reception = Reception(current.stream, current.framesReceived, current.solvedCount)) }
+                    updateReception(scan.epoch) { Reception(current.stream, current.framesReceived, current.solvedCount) }
                     if (current.complete) {
-                        val file = Container.unpack(current.assemble())
+                        val container = current.assemble()
+                        val originalSize = java.nio.ByteBuffer.wrap(container).order(java.nio.ByteOrder.LITTLE_ENDIAN).getInt(9)
+                        require(originalSize in 1..memoryLimit) { "Expanded file exceeds this device's safe limit (${formatSize(memoryLimit.toLong())})." }
+                        val file = Container.unpack(container)
                         if (scan.epoch != epoch.get()) continue
                         val receipt = persist(file)
-                        if (scan.epoch == epoch.get()) mutable.update {
-                            it.copy(reception = it.reception.copy(receipt = receipt))
-                        }
+                        updateReception(scan.epoch) { it.copy(receipt = receipt) }
                         finished = true
                         decoder = null
                         refreshHistory()
                     }
                 } catch (e: CancellationException) { throw e }
                 catch (e: Exception) {
-                    if (scan.epoch == epoch.get()) mutable.update {
-                        it.copy(reception = it.reception.copy(error = e.message ?: "Could not receive this file."))
-                    }
+                    updateReception(scan.epoch) { it.copy(error = e.message ?: "Could not receive this file.") }
                     decoder = null; finished = true
                 }
             }
         }
     }
 
+    private fun updateReception(expectedEpoch: Int, transform: (Reception) -> Reception) {
+        // The epoch check is inside StateFlow's CAS retry loop: a reset cannot be
+        // overwritten by a late decoder update from the previous optical session.
+        mutable.update { if (expectedEpoch == epoch.get()) it.copy(reception = transform(it.reception)) else it }
+    }
     fun acceptQr(bytes: ByteArray) { scans.trySend(Scanned(epoch.get(), bytes)) }
     fun resetReceiver() {
         epoch.incrementAndGet()
@@ -123,12 +134,12 @@ internal class TransferViewModel(application: Application) : AndroidViewModel(ap
         resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)?.use { cursor ->
             if (cursor.moveToFirst()) {
                 val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
-                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) require(cursor.getLong(sizeIndex) <= MAX_FILE_BYTES) { "Files are limited to 64 MiB." }
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) require(cursor.getLong(sizeIndex) <= memoryLimit) { "This device supports files up to ${formatSize(memoryLimit.toLong())}." }
                 val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
                 if (nameIndex >= 0) name = cursor.getString(nameIndex) ?: name
             }
         }
-        val bytes = resolver.openInputStream(uri)?.use { it.readBounded(MAX_FILE_BYTES) }
+        val bytes = resolver.openInputStream(uri)?.use { it.readBounded(memoryLimit) }
             ?: error("This file provider could not open the file.")
         Triple(name, resolver.getType(uri) ?: "application/octet-stream", bytes)
     }

@@ -137,7 +137,7 @@ private fun HomeScreen(state: TransferState, onSend: () -> Unit, onReceive: () -
             Text("HOW IT WORKS", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
             TextButton(onInbox) { Text("Inbox · ${state.history.size}") }
         }
-        Step("01", "Choose", "Pick any non-empty file up to 64 MiB, or send a text snippet.")
+        Step("01", "Choose", "Pick a file up to ${formatSize(state.maxFileBytes.toLong())} on this device, or send a text snippet.")
         Step("02", "Point", "Open Receive on the other device. Keep the entire QR code in view.")
         Step("03", "Keep", "We verify every byte before you save or share the received file.")
         Note("Offline, not encrypted", "Anyone who can see the QR stream can receive it. Transfer sensitive files in a private space. SHA-256 checks integrity, not who sent the file.")
@@ -188,9 +188,13 @@ private fun SendScreen(state: TransferState, vm: TransferViewModel) {
         Heading(if (sending == null) "What’s going across?" else "Ready on the other side?",
             if (sending == null) "Choose a file or write a message. Nothing is uploaded." else "Open Receive on the other device and point its camera here.")
         if (sending == null) {
-            if (state.busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Preparing and hashing your file…") }
+            if (state.busy) {
+                LinearProgressIndicator(Modifier.fillMaxWidth())
+                Text("Preparing and hashing your file…")
+                TextButton(vm::clearSender) { Text("Cancel preparation") }
+            }
             Button({ picker.launch(arrayOf("*/*")) }, Modifier.fillMaxWidth().heightIn(min = 56.dp), enabled = !state.busy) { Text("Choose a file") }
-            Text("Any file type · up to 64 MiB · small files work best", style = MaterialTheme.typography.bodySmall)
+            Text("Any file type · up to ${formatSize(state.maxFileBytes.toLong())} on this device", style = MaterialTheme.typography.bodySmall)
             HorizontalDivider()
             OutlinedTextField(text, { if (it.length <= 50000) text = it }, Modifier.fillMaxWidth(),
                 label = { Text("Or send a text snippet") }, minLines = 4, maxLines = 8, enabled = !state.busy,

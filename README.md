@@ -12,7 +12,7 @@ This is an independent application, not an official Decimen product.
 
 ## Features
 
-- Native file picker and text snippets; arbitrary non-empty files up to **64 MiB**.
+- Native file picker and text snippets; arbitrary non-empty files up to **64 MiB**, with a lower safe limit on low-heap devices.
 - Binary QR frames, robust-soliton LT fountain coding, dropped/duplicate/out-of-order
   frame recovery, opportunistic gzip, filename and MIME preservation.
 - FNV-1a container verification **and SHA-256 file verification** before saving anything.
@@ -40,7 +40,8 @@ Start with one Balanced QR at 8 fps. Try Easy and 4 fps if decoding is unreliabl
 Use Dense for large files: the protocol's 65,535-block ceiling limits incompressible
 files to about 32 MiB in Easy mode and just under 64 MiB in Balanced mode. Multiple
 QR codes need a sufficiently large screen. Optical transfer is slower than a cable;
-64 MiB is a size ceiling, not a promise of practical speed or memory availability on
+The app additionally limits transfers to one eighth of the Android process heap (shown
+on the Send screen), and caps its pending decoder graph. 64 MiB is a size ceiling, not a promise of practical speed or memory availability on
 low-RAM devices. Decoder limits can stop unusually expensive transfers with an error.
 
 ## Compatibility and scope

@@ -97,7 +97,11 @@ class FountainEncoder(private val data: ByteArray, blockSize: Int, session: Int)
 }
 
 /** Single-thread confined peeling decoder. Bounded equations/edges resist hostile QR input. */
-class FountainDecoder(val stream: StreamId) {
+class FountainDecoder(
+    val stream: StreamId,
+    private val maxPendingBytes: Long = 96L * 1024 * 1024,
+    private val maxEdges: Int = 2_000_000,
+) {
     private class Equation(val indices: MutableSet<Int>, val bytes: ByteArray)
     private val cdf = solitonCdf(stream.k)
     private val solved = arrayOfNulls<ByteArray>(stream.k)
@@ -118,8 +122,8 @@ class FountainDecoder(val stream: StreamId) {
         for (i in indices.toList()) solved[i]?.let { xor(bytes, it); indices.remove(i) }
         if (indices.isEmpty()) return
         if (indices.size == 1) { resolve(indices.first(), bytes); return }
-        require(edges + indices.size <= 2_000_000 &&
-            (equations.toLong() + 1) * stream.blockSize <= 96L * 1024 * 1024) {
+        require(edges + indices.size <= maxEdges &&
+            (equations.toLong() + 1) * stream.blockSize <= maxPendingBytes) {
             "Decoder memory limit reached. Restart with a smaller file."
         }
         val eq = Equation(indices, bytes)

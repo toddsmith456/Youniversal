@@ -45,6 +45,9 @@ Internal files use UUIDs, never sender-controlled filesystem paths.
   equation byte buffers (object overhead and solved blocks require additional RAM).
 - Camera queue holds only latest image; ingestion channel holds at most 16 QR payloads.
 - Verified inbox ≤256 MiB; requires 16 MiB spare filesystem space when storing a file.
+- Android admission limit is min(64 MiB, max heap / 8), shown on Send. Expanded size is
+  checked against this limit before inflation. App graph limit is 500,000 edges and the
+  same heap-derived pending-byte budget; protocol defaults above are for JVM consumers.
 - Android process memory and filesystem quota remain additional platform constraints.
 
 FNV detects reconstruction mistakes; SHA-256 detects payload corruption. Neither is
