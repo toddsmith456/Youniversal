@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-package dev.youniversal.demo.ui
+package dev.lightbridge.app
 
 import android.os.Build
 import androidx.compose.foundation.background
@@ -22,7 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import dev.youniversal.demo.DemoIcons
+import dev.lightbridge.app.AppIcons
 import dev.youniversal.theme.YouniversalBackgroundStyle
 import dev.youniversal.theme.YouniversalCard
 import dev.youniversal.theme.YouniversalContrast
@@ -92,7 +92,7 @@ internal fun ThemePanel(
                 subtitle =
                     if (state.enabled) "Applied to the whole app"
                     else "Off — the app falls back to baseline Material 3",
-                leadingIcon = DemoIcons.Mark,
+                leadingIcon = AppIcons.Mark,
                 trailing = {
                     YouniversalSwitch(checked = state.enabled, onCheckedChange = state::setEnabled)
                 },
@@ -136,7 +136,7 @@ internal fun ThemePanel(
                         seedActive -> "Paused while an accent seed is active"
                         else -> "Derive the palette from the wallpaper"
                     },
-                leadingIcon = DemoIcons.Droplet,
+                leadingIcon = AppIcons.Droplet,
                 enabled = dynamicAvailable,
                 trailing = {
                     YouniversalSwitch(
@@ -251,7 +251,7 @@ private fun SeedSwatch(
 
                 selected ->
                     Icon(
-                        imageVector = DemoIcons.Check,
+                        imageVector = AppIcons.Check,
                         contentDescription = null,
                         modifier = Modifier.size(18.dp),
                         tint = color.youniversalReadableContentColor(),

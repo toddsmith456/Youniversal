@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-package dev.youniversal.demo
+package dev.lightbridge.app
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
  * icons, and drawing them keeps the app's dependency list down to Compose plus Youniversal while
  * matching the system's rounded, two-weight line style.
  */
-public object DemoIcons {
+public object AppIcons {
 
     private const val Viewport = 24f
     private val Ink = SolidColor(Color.Black)
