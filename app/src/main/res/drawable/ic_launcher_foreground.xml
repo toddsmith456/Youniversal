@@ -1,5 +1,27 @@
-<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#DCE9FF" android:pathData="M28,28h22v22h-22z M58,28h22v22h-22z M28,58h22v22h-22z" />
-    <path android:fillColor="#163A53" android:pathData="M34,34h10v10h-10z M64,34h10v10h-10z M34,64h10v10h-10z" />
-    <path android:fillColor="#9FF6D2" android:pathData="M60,60h8v8h-8z M72,60h8v8h-8z M60,72h8v8h-8z M72,72h8v8h-8z" />
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Youniversal launcher mark: a "Y" drawn as two rounded strokes, so it scales cleanly. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group
+        android:scaleX="1.0"
+        android:scaleY="1.0"
+        android:translateX="0"
+        android:translateY="0">
+        <path
+            android:pathData="M36,34 L54,58 L72,34"
+            android:strokeColor="@color/ic_launcher_mark"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="9" />
+        <path
+            android:pathData="M54,58 L54,80"
+            android:strokeColor="@color/ic_launcher_mark"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="9" />
+    </group>
 </vector>
