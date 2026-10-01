@@ -5,15 +5,17 @@ plugins {
 }
 
 android {
-    namespace = "dev.youniversal.demo"
+    namespace = "dev.lightbridge.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        applicationId = "dev.youniversal.demo"
+        applicationId = "dev.lightbridge.app"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 1
-        versionName = libs.versions.youniversal.get()
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Overridden by the release workflow from the pushed v* tag; see docs/RELEASING.md.
+        versionCode = (project.findProperty("lightbridge.versionCode") as String).toInt()
+        versionName = project.findProperty("lightbridge.versionName") as String
 
         vectorDrawables.useSupportLibrary = false
     }
@@ -26,8 +28,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
-            // Signed with the debug key so `assembleRelease` works out of the box.
-            signingConfig = signingConfigs.getByName("debug")
+            // Deliberately no signingConfig: Gradle's release output stays UNSIGNED and is never
+            // signed with Android's public debug identity. The release workflow signs it with
+            // apksigner using a key held only in GitHub secrets (docs/RELEASING.md).
         }
     }
 
@@ -39,6 +42,13 @@ android {
     buildFeatures {
         compose = true
     }
+
+    lint {
+        abortOnError = true
+        checkReleaseBuilds = true
+        checkDependencies = true
+        sarifReport = true
+    }
 }
 
 kotlin {
@@ -49,6 +59,20 @@ kotlin {
 
 dependencies {
     implementation(project(":youniversal"))
+    implementation(project(":transfer"))
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.1")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    testImplementation(libs.junit)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.compose.ui.test.junit4)
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    debugImplementation(libs.compose.ui.test.manifest)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.activity.compose)
